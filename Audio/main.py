@@ -4,6 +4,7 @@ import os
 import numpy as np
 import librosa
 import soundfile as sf
+import re
 from multiprocessing import Process
 
 # ==========================
@@ -199,7 +200,23 @@ def generate_audio_job(bg_noise, version):
     out_dir = os.path.join(OUTPUT_ROOT, bg_noise)
     os.makedirs(out_dir, exist_ok=True)
 
-    out_path = os.path.join(out_dir, f"{bg_noise}_{version}.wav")
+    # ------------
+    file_name = 20
+    files = os.listdir(out_dir)
+
+    # Extract numbers from filenames and find the highest
+    numbers = []
+    for file in files:
+        # Assuming filenames contain numbers like fan_1.wav
+        match = re.search(r'\d+', file)
+        if match:
+            numbers.append(int(match.group()))
+
+    if numbers:
+        highest_number = max(numbers)
+        file_name = highest_number + 1
+
+    out_path = os.path.join(out_dir, f"{file_name}.wav")
     sf.write(out_path, audio, SR)
 
     print(f"[JOB DONE] {out_path}")
@@ -208,8 +225,8 @@ def generate_audio_job(bg_noise, version):
 # PARALLEL RUNNER
 # ==========================
 
-def run_bg_noise_job(bg_noise, versions):
-    for v in range(1, versions + 1):
+def run_bg_noise_job(bg_noise, audios_to_add):
+    for v in range(1, audios_to_add + 1):
         generate_audio_job(bg_noise, v)
 
 # ==========================
@@ -218,14 +235,14 @@ def run_bg_noise_job(bg_noise, versions):
 
 if __name__ == "__main__":
     bg_noises = ["fan", "white_noise", "none"]
-    versions_per_noise = 1
+    audios_to_add = 1
 
     processes = []
 
     for bg in bg_noises:
         p = Process(
             target=run_bg_noise_job,
-            args=(bg, versions_per_noise)
+            args=(bg, audios_to_add)
         )
         p.start()
         processes.append(p)
