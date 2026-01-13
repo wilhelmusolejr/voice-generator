@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Voice Generator Control</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #0f172a;
+        color: #e5e7eb;
+        padding: 30px;
+      }
+
+      .container {
+        max-width: 500px;
+        margin: auto;
+        background: #020617;
+        padding: 25px;
+        border-radius: 10px;
+      }
+
+      h2 {
+        margin-bottom: 20px;
+        text-align: center;
+      }
+
+      label {
+        display: block;
+        margin-top: 15px;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+
+      select,
+      button {
+        width: 100%;
+        padding: 10px;
+        border-radius: 6px;
+        border: none;
+        font-size: 14px;
+      }
+
+      select {
+        background: #1e293b;
+        color: white;
+      }
+
+      .checkbox-group {
+        margin-top: 10px;
+      }
+
+      .checkbox-group label {
+        font-weight: normal;
+        display: flex;
+        align-items: center;
+        margin-bottom: 5px;
+      }
+
+      .checkbox-group input {
+        margin-right: 8px;
+      }
+
+      button {
+        margin-top: 25px;
+        background: #22c55e;
+        color: #052e16;
+        font-weight: bold;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: #16a34a;
+      }
+
+      .status {
+        margin-top: 15px;
+        text-align: center;
+        font-size: 14px;
+        opacity: 0.8;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>Voice Generator</h2>
+
+      <!-- USER -->
+      <label for="user">User</label>
+      <select id="user">
+        <option value="botfrag666">botfrag666</option>
+        <option value="elooo2092">elooo2092</option>
+        <option value="echogreg">echogreg</option>
+        <option value="kooooalaid">kooooalaid</option>
+        <option value="g3ooorge">g3ooorge</option>
+      </select>
+
+      <!-- RANDOM AUDIO -->
+      <h3 style="margin-top: 30px; text-align: center">Random Audio</h3>
+      <button
+        onclick="pickRandomAudio()"
+        style="background: #3b82f6; color: white"
+      >
+        Pick Random Audio
+      </button>
+      <div id="fanStatus" class="status"></div>
+      <audio
+        id="fanPlayer"
+        controls
+        style="display: none; width: 100%; margin-top: 15px"
+      ></audio>
+    </div>
+
+    <script>
+      let pollInterval = null;
+
+      function generate() {
+        const data = {
+          user: document.getElementById("user").value,
+          bg_noise: document.getElementById("bgNoise").value,
+          effects: {
+            dog_howl: document.getElementById("dogHowl").checked,
+            car_horn: document.getElementById("carHorn").checked,
+          },
+        };
+
+        const status = document.getElementById("status");
+        const audio = document.getElementById("audioPlayer");
+
+        status.innerText = "Generating audio...";
+        audio.style.display = "none";
+        audio.src = "";
+
+        fetch("/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        })
+          .then((res) => res.json())
+          .then((res) => {
+            const jobId = res.job_id;
+            pollForAudio(jobId);
+          })
+          .catch(() => {
+            status.innerText = "Error starting generation";
+          });
+      }
+
+      function pollForAudio(jobId) {
+        const status = document.getElementById("status");
+        const audio = document.getElementById("audioPlayer");
+
+        pollInterval = setInterval(() => {
+          fetch(`/audio/${jobId}`)
+            .then((res) => {
+              if (res.status === 202) {
+                status.innerText = "Generating audio... please wait";
+                return null;
+              }
+
+              if (res.ok) {
+                clearInterval(pollInterval);
+                audio.src = `/audio/${jobId}`;
+                audio.style.display = "block";
+                status.innerText = "Audio ready!";
+                audio.load();
+                audio.play();
+              }
+            })
+            .catch(() => {
+              status.innerText = "Waiting for audio...";
+            });
+        }, 2000);
+      }
+
+      function pickRandomAudio() {
+        const user = document.getElementById("user").value;
+        const fanStatus = document.getElementById("fanStatus");
+        const fanAudio = document.getElementById("fanPlayer");
+
+        fanStatus.innerText = "Picking random audio...";
+        fanAudio.style.display = "none";
+        fanAudio.src = "";
+
+        fetch("/random_audio", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user: user }),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.error) {
+              fanStatus.innerText = data.error;
+              return;
+            }
+            const filename = data.filename;
+            fanStatus.innerText = `Chosen: ${filename}`;
+            fanAudio.src = `/audio_file/${filename}`;
+            fanAudio.style.display = "block";
+            fanAudio.load();
+            fanAudio.play();
+          })
+          .catch(() => {
+            fanStatus.innerText = "Error picking random audio";
+          });
+      }
+    </script>
+  </body>
+</html>
