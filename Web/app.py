@@ -91,6 +91,20 @@ def random_audio():
     chosen = random.choice(files)
     return {"filename": f"{folder}/{chosen}"}
 
+@app.route("/user_audios/<user>")
+def get_user_audios(user):
+    if not user or user not in USER_MAPPING:
+        return {"error": "Invalid user"}, 400
+    folder = USER_MAPPING[user]
+    folder_path = os.path.join(OUTPUT_DIR, folder)
+    if not os.path.exists(folder_path):
+        return {"audios": []}
+    files = [f for f in os.listdir(folder_path) if f.endswith('.wav')]
+    # Sort by number in filename
+    import re
+    files.sort(key=lambda x: int(re.search(r'\d+', x).group()) if re.search(r'\d+', x) else 0)
+    return {"audios": files, "folder": folder}
+
 @app.route("/audio_file/<path:filepath>")
 def get_audio_file(filepath):
     full_path = os.path.join(OUTPUT_DIR, filepath)

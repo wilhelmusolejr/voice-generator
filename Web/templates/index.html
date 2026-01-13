@@ -86,7 +86,7 @@
 
       <!-- USER -->
       <label for="user">User</label>
-      <select id="user">
+      <select id="user" onchange="loadUserAudios()">
         <option value="botfrag666">botfrag666</option>
         <option value="elooo2092">elooo2092</option>
         <option value="echogreg">echogreg</option>
@@ -108,7 +108,10 @@
         controls
         style="display: none; width: 100%; margin-top: 15px"
       ></audio>
-    </div>
+
+      <!-- AUDIO LIST -->
+      <h3 style="margin-top: 30px; text-align: center">All Audios</h3>
+      <div id="audioList" style="margin-top: 20px;"></div>
 
     <script>
       let pollInterval = null;
@@ -203,6 +206,57 @@
             fanStatus.innerText = "Error picking random audio";
           });
       }
+
+      function loadUserAudios() {
+        const user = document.getElementById("user").value;
+        const audioList = document.getElementById("audioList");
+        audioList.innerHTML = "Loading audios...";
+
+        fetch(`/user_audios/${user}`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.error) {
+              audioList.innerHTML = data.error;
+              return;
+            }
+            const audios = data.audios;
+            const folder = data.folder;
+            if (audios.length === 0) {
+              audioList.innerHTML = "No audios found";
+              return;
+            }
+            audioList.innerHTML = "";
+            audios.forEach((filename, index) => {
+              const audioItem = document.createElement("div");
+              audioItem.style.marginBottom = "20px";
+              audioItem.innerHTML = `
+                <div style="font-weight: bold; margin-bottom: 5px;">${filename}</div>
+                <audio id="audio-${index}" controls style="width: 100%;">
+                  <source src="/audio_file/${folder}/${filename}" type="audio/wav">
+                </audio>
+              `;
+              audioList.appendChild(audioItem);
+
+              const audioElement = document.getElementById(`audio-${index}`);
+              audioElement.addEventListener("ended", () => {
+                playNext(index + 1, audios, folder);
+              });
+            });
+          })
+          .catch(() => {
+            audioList.innerHTML = "Error loading audios";
+          });
+      }
+
+      function playNext(currentIndex, audios, folder) {
+        if (currentIndex < audios.length) {
+          const nextAudio = document.getElementById(`audio-${currentIndex}`);
+          nextAudio.play();
+        }
+      }
+
+      // Load audios on page load
+      window.onload = loadUserAudios;
     </script>
   </body>
 </html>
