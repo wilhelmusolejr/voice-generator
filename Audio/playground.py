@@ -1,35 +1,56 @@
-import time
-import random
-import os
-import numpy as np
-import librosa
-import re
-import soundfile as sf
+ENEMY_INFO_PHRASES = [
+  "May kalaban sa kanan mo ahhhh.",
+  "Isa sa harap mo, ayaw pang maniwala.",
+  "Uy! Uy! Jaaan sa likod ng BOX, BOX NGA!,",
+  "Sa taas mo Jef, ayan naaaa... may sapa",
+  "Dalawa! Dalawa! sa sa kanan mo!...",
+  "May gumagalaw, kalma ka, likod mo!, jan na... sa likod.",
+  "Sa may wall, ingat, tago tago tago ka, tago ka!.",
+  "Isa lang sa corner, muka mo!",
+  "May KALABAN, sa harap, oo!, check niyo.",
+  "Sa likod ko ahhh, isa pa, isa pa please.",
 
+  "Dalawa sa harap.",
+  "May sumilip sa kanan.",
+  "Sa taas ulit, same spot.",
+  "Isa sa kaliwa.",
+  "May kalaban sa likod ng poste.",
+  "Sa may box, di gumagalaw.",
+  "May narinig ako sa kanan.",
+  "Sa baba, isa.",
+  "May flanking sa likod.",
+  "Sa corner, nakaabang.",
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-OUTPUT_ROOT = os.path.join(BASE_DIR, "output")
-out_dir = os.path.join(OUTPUT_ROOT, "fan")
+  "Isa sa harap lang.",
+  "Dalawa sa may wall.",
+  "May kalaban sa taas, naka-aim.",
+  "Sa kanan, may gumalaw.",
+  "Sa likod ng truck, isa.",
+  "May tumakbo sa kaliwa.",
+  "Sa gitna, ingat.",
+  "Isa sa may hagdan.",
+  "May kalaban sa spawn side.",
+  "Sa likod, check niyo.",
 
-print(out_dir)
+  "Dalawa sa kanan, sabay.",
+  "Isa sa harap, malapit.",
+  "May kalaban sa taas ng box.",
+  "Sa may gilid, isa.",
+  "May sumilip sa window.",
+  "Sa kanan ulit, same.",
+  "Isa sa likod, malayo.",
+  "May kalaban sa left side.",
+  "Sa harap, naka-crouch.",
+  "Dalawa sa baba.",
 
-# List all files in out_dir
-files = os.listdir(out_dir)
-
-# Print each file name
-for file in files:
-    print(file)
-
-# Extract numbers from filenames and find the highest
-numbers = []
-for file in files:
-    # Assuming filenames contain numbers like fan_1.wav
-    match = re.search(r'\d+', file)
-    if match:
-        numbers.append(int(match.group()))
-
-if numbers:
-    highest_number = max(numbers)
-    print(f"Highest number: {highest_number}")
-else:
-    print("No numbers found in filenames")
+  "May kalaban sa taas ng stairs.",
+  "Isa sa may gate.",
+  "Sa likod ng wall, ingat.",
+  "May gumalaw sa kanan ulit.",
+  "Sa may cover, isa.",
+  "Dalawa sa harap, hiwalay.",
+  "May kalaban sa kaliwa, malapit.",
+  "Isa sa may corner lang.",
+  "Sa likod, may sumunod.",
+  "May kalaban pa sa harap."
+]
