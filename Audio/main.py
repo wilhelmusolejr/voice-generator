@@ -8,15 +8,45 @@ import re
 from multiprocessing import Process
 
 # ==========================
+# USER CONFIGURATION
+# ==========================
+
+# Audio Settings
+SR = 8000  # Sample rate (Hz)
+USER_NAME = "user1"
+
+# Duration Settings (in seconds)
+BASE_DURATION_SECONDS = 1 * 3600 + 20 * 60  # 1 hour 20 minutes (80 min)
+EXTRA_DURATION_MIN = 5 * 60  # Minimum extra duration (5 min)
+EXTRA_DURATION_MAX = 15 * 60  # Maximum extra duration (15 min)
+
+# Generation Settings
+BACKGROUND_NOISES = ["fan", "white_noise", "none"]  # Types of background noise
+AUDIOS_TO_GENERATE = 4  # Number of audio files to generate per background noise type
+USE_MULTIPROCESSING = True  # Enable parallel processing
+
+# Voice Processing Settings
+SILENCE_CHANCE = 0.15  # Probability of adding silence instead of playing clip (0.0-1.0)
+SILENCE_MIN = 0.15  # Minimum silence duration (seconds)
+SILENCE_MAX = 0.6  # Maximum silence duration (seconds)
+FADE_CHANCE = 0.25  # Probability of adding fade effect (0.0-1.0)
+FADE_MIN = 0.7  # Minimum fade level
+FADE_MAX = 0.9  # Maximum fade level
+CLIP_TRIM_CHANCE = 0.2  # Probability of trimming clip end (0.0-1.0)
+CLIP_TRIM_MIN = 0.85  # Minimum clip trim ratio
+CLIP_TRIM_MAX = 0.95  # Maximum clip trim ratio
+
+# Audio Mixing Settings
+BG_NOISE_LEVEL = 0.01  # Background noise amplitude level
+PEAK_NORMALIZATION = 0.9  # Peak normalization level (0.0-1.0)
+FINAL_PEAK_NORMALIZATION = 0.95  # Final peak normalization after mixing
+
+# ==========================
 # BASE CONFIG
 # ==========================
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_ROOT = os.path.join(BASE_DIR, "output")
-
-SR = 16000
-
-user = "user1"
 
 # ==========================
 # ROUND LOGIC
@@ -98,14 +128,14 @@ def play_random_clip_from(source, state):
     intensity = INTENSITY.get(source, 0.4)
     state["energy"] = state["energy"] * 0.7 + intensity * 0.3
 
-    if random.random() < 0.2:
-        audio = audio[: int(len(audio) * random.uniform(0.85, 0.95))]
+    if random.random() < CLIP_TRIM_CHANCE:
+        audio = audio[: int(len(audio) * random.uniform(CLIP_TRIM_MIN, CLIP_TRIM_MAX))]
 
-    if user == "g3ooorge":
+    if USER_NAME == "g3ooorge":
         audio = soften_voice(audio)
 
-    if random.random() < 0.25:
-        fade = np.linspace(1.0, random.uniform(0.7, 0.9), len(audio))
+    if random.random() < FADE_CHANCE:
+        fade = np.linspace(1.0, random.uniform(FADE_MIN, FADE_MAX), len(audio))
         audio *= fade
 
     gain_db = random.uniform(-1.0, 1.5) * state["energy"]
@@ -118,18 +148,25 @@ def add_silence(seconds, state):
     silence = np.zeros(int(seconds * SR))
     state["audio"] = np.concatenate([state["audio"], silence])
 
-def mix_background_noise(speech, bg_noise, level=0.01):
+def mix_background_noise(speech, bg_noise, level=None):
+    if level is None:
+        level = BG_NOISE_LEVEL
     noise_path = os.path.join(BASE_DIR, "voices", "bg_noise", f"{bg_noise}.mp3")
     if not os.path.exists(noise_path):
         return speech
 
-    noise, _ = librosa.load(noise_path, sr=SR)
+    try:
+        noise, _ = librosa.load(noise_path, sr=SR)
 
-    if len(noise) < len(speech):
-        noise = np.tile(noise, int(np.ceil(len(speech) / len(noise))))
+        if len(noise) < len(speech):
+            noise = np.tile(noise, int(np.ceil(len(speech) / len(noise))))
 
-    noise = noise[: len(speech)]
-    return speech + noise * level
+        noise = noise[: len(speech)]
+        return speech + noise * level
+    except (MemoryError, np.core._exceptions._ArrayMemoryError) as e:
+        print(f"[WARNING] Failed to load background noise '{bg_noise}': {e}")
+        print("[WARNING] Skipping background noise mixing for this file")
+        return speech
 
 # ==========================
 # ROUND GENERATION
@@ -147,8 +184,8 @@ def generate_round(state):
         if random.random() > PLAY_PROBABILITY[source]:
             continue
 
-        if random.random() < 0.15:
-            add_silence(random.uniform(0.15, 0.6), state)
+        if random.random() < SILENCE_CHANCE:
+            add_silence(random.uniform(SILENCE_MIN, SILENCE_MAX), state)
             continue
 
         play_random_clip_from(source, state)
@@ -175,9 +212,8 @@ def generate_audio_job(bg_noise, version):
         "energy": 0.3,
     }
 
-    BASE_SECONDS = 1 * 3600 + 20 * 60
-    EXTRA_SECONDS = random.randint(5 * 60, 15 * 60)
-    TARGET_SECONDS = BASE_SECONDS + EXTRA_SECONDS
+    EXTRA_SECONDS = random.randint(EXTRA_DURATION_MIN, EXTRA_DURATION_MAX)
+    TARGET_SECONDS = BASE_DURATION_SECONDS + EXTRA_SECONDS
 
     print(f"[JOB START] {bg_noise} v{version}")
 
@@ -188,20 +224,20 @@ def generate_audio_job(bg_noise, version):
 
     peak = np.max(np.abs(audio))
     if peak > 0:
-        audio = audio / peak * 0.9
+        audio = audio / peak * PEAK_NORMALIZATION
 
     if bg_noise != "none":
         audio = mix_background_noise(audio, bg_noise)
 
     peak = np.max(np.abs(audio))
     if peak > 0:
-        audio = audio / peak * 0.95
+        audio = audio / peak * FINAL_PEAK_NORMALIZATION
 
     out_dir = os.path.join(OUTPUT_ROOT, bg_noise)
     os.makedirs(out_dir, exist_ok=True)
 
     # ------------
-    file_name = 20
+    file_name = 0
     files = os.listdir(out_dir)
 
     # Extract numbers from filenames and find the highest
@@ -234,20 +270,21 @@ def run_bg_noise_job(bg_noise, audios_to_add):
 # ==========================
 
 if __name__ == "__main__":
-    bg_noises = ["fan", "white_noise", "none"]
-    audios_to_add = 1
-
     processes = []
 
-    for bg in bg_noises:
-        p = Process(
-            target=run_bg_noise_job,
-            args=(bg, audios_to_add)
-        )
-        p.start()
-        processes.append(p)
+    if USE_MULTIPROCESSING:
+        for bg in BACKGROUND_NOISES:
+            p = Process(
+                target=run_bg_noise_job,
+                args=(bg, AUDIOS_TO_GENERATE)
+            )
+            p.start()
+            processes.append(p)
 
-    for p in processes:
-        p.join()
+        for p in processes:
+            p.join()
+    else:
+        for bg in BACKGROUND_NOISES:
+            run_bg_noise_job(bg, AUDIOS_TO_GENERATE)
 
     print("\nAll audio generation jobs completed.")
